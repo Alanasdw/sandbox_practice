@@ -18,7 +18,7 @@
 // sudo apt-get install libseccomp-dev
 #include <seccomp.h>
 
-#define ARGC_AMOUNT 9
+#define ARGC_AMOUNT 10
 
 
 int main( int argc, char *argv[])
@@ -26,6 +26,7 @@ int main( int argc, char *argv[])
     /* getting the limits and files by arguments listed in the order below
      * any changes here should change ARGC_AMOUNT accordingly
      * 
+     * ./sandbox ( must be here)
      * program.c
      * file_stdin
      * file_stdout
@@ -49,17 +50,29 @@ int main( int argc, char *argv[])
     }// if
 
     // naming the arguments
-    char *program = argv[ 0]; // is this the right one??
-    char *file_stdin = argv[ 1];
-    char *file_stdout = argv[ 2];
-    char *file_stderr = argv[ 3];
-    char *file_result = argv[ 4];
+    char *program = argv[ 1];
+    char *file_stdin = argv[ 2];
+    char *file_stdout = argv[ 3];
+    char *file_stderr = argv[ 4];
+    char *file_result = argv[ 5];
 
-    int32_t time_limit = strtol( argv[ 5], NULL, 10);
-    int32_t memory_limit = strtol( argv[ 6], NULL, 10);
-    int32_t output_limit = strtol( argv[ 7], NULL, 10);
-    int32_t process_limit = strtol( argv[ 8], NULL, 10);
+    int32_t time_limit = strtol( argv[ 6], NULL, 10);
+    int32_t memory_limit = strtol( argv[ 7], NULL, 10);
+    int32_t output_limit = strtol( argv[ 8], NULL, 10);
+    int32_t process_limit = strtol( argv[ 9], NULL, 10);
 
+    // testing the information
+    /*
+    printf("program %s)\n", program);
+    printf("file in %s)\n", file_stdin);
+    printf("file out %s)\n", file_stdout);
+    printf("file err %s)\n", file_stderr);
+    printf("file result %s)\n", file_result);
+    printf("time limit %d\n", time_limit);
+    printf("memory limit %d\n", memory_limit);
+    printf("output limit %d\n", output_limit);
+    printf("process limit %d\n", process_limit);
+    */
 
     // need to check the file io permissions
 

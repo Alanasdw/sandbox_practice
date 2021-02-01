@@ -1,6 +1,27 @@
+CC = gcc
+CFLAGS = -Wall -g
+LIB = -pthread -lseccomp
+OUTPUT_OPTION = -MMD -MP -o $@
 
+SOURCE = sandbox.c
+OBJS = $(SOURCE:.c=.o)
+DEPS = $(SOURCE:.c=.d)
+-include ${DEPS}
 
+sandbox: ${OBJS}
+	${CC} ${OBJS} ${LIB} -o sandbox
 
-all:
+test:
+	# sandbox program.c file_in file_out file_err file_result time_limit memory_limit output_limit process_limit
+	./sandbox main.c file_input.txt file_ouput.txt file_error.txt file_result.txt 1 1024 1024 1
+
+help:
+	-@echo "make help: display this help message"
+	-@echo "make sandbox: compile the sandbox.c"
+	-@echo "make test: run the sandbox with the arguments"
+	-@echo "make clean: clear the directory free of garbage"
 
 clean:
+	rm *.d
+	rm *.o
+	rm sandbox
