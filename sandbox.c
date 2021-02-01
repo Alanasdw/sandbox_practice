@@ -8,6 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+// used in close
+#include <unistd.h>
+
 // need to be compiled with -pthread
 // used in the watcher routine
 #include <pthread.h>
@@ -17,6 +20,9 @@
 // need to install the library first with
 // sudo apt-get install libseccomp-dev
 #include <seccomp.h>
+
+// for compiling the program that is sent in
+#include "compile.h"
 
 #define ARGC_AMOUNT 10
 
@@ -74,9 +80,35 @@ int main( int argc, char *argv[])
     printf("process limit %d\n", process_limit);
     */
 
+    // printf("compile %d\n", compile( program));
+
+    int program_fd = open( program, O_RDONLY);
+
+    if ( program_fd == -1)
+    {
+        perror( "Program open error");
+
+        return -1;
+    }// if
+    
+
+    int32_t compile_result = compile( program);
+
+    if ( compile_result != 0)
+    {
+        printf("Compile error %d\n", compile_result);
+
+        return -1;
+    }// if
+   
+
     // need to check the file io permissions
 
+
+
     // multiprocess needed here
+
+    close( program_fd);
 
     return 0;
 }
