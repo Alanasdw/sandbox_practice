@@ -13,7 +13,7 @@ sandbox: ${OBJS}
 
 test:
 	# sandbox program.c file_in file_out file_err file_result time_limit memory_limit output_limit process_limit
-	./sandbox test.c file_input.txt file_ouput.txt file_error.txt file_result.txt 1 1024 1024 1
+	./sandbox test.c file_input.txt file_output.txt file_error.txt file_result.txt 1 1024 1024 1
 
 help:
 	-@echo "make help: display this help message"

@@ -6,7 +6,7 @@ int32_t compile( char *name)
 
     char *gcc = "gcc ";
 
-    char *arguments = " -lm -O2 -w -std=c11 -pipe -DONLINE_JUDGE -o main";
+    char *arguments = " -lm -O2 -w -Wfatal-errors -std=c11 -pipe -DONLINE_JUDGE -o main";
 
     char *full = calloc( strlen( gcc) + strlen( arguments) + strlen( name) + 1, sizeof( char));
 

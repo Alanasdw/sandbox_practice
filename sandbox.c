@@ -26,6 +26,8 @@
 
 #define ARGC_AMOUNT 10
 
+int32_t file_test( char *name, int32_t mode); // 1 = read, 2 = write
+
 
 int main( int argc, char *argv[])
 {
@@ -80,19 +82,19 @@ int main( int argc, char *argv[])
     printf("process limit %d\n", process_limit);
     */
 
-    // printf("compile %d\n", compile( program));
+    // need to check the file io permissions
 
-    int program_fd = open( program, O_RDONLY);
+	if ( file_test( program, 1) || file_test( file_stdin, 1) || file_test( file_stdout, 2) ||
+			file_test( file_stderr, 2) || file_test( file_result, 2))
+	{
+		printf("File open error\n");
 
-    if ( program_fd == -1)
-    {
-        perror( "Program open error");
+		return -1;
+	}// if
 
-        return -1;
-    }// if
-    
+	// printf("compile %d\n", compile( program));
 
-    int32_t compile_result = compile( program);
+	int32_t compile_result = compile( program);
 
     if ( compile_result != 0)
     {
@@ -102,13 +104,52 @@ int main( int argc, char *argv[])
     }// if
    
 
-    // need to check the file io permissions
-
-
-
     // multiprocess needed here
 
-    close( program_fd);
 
     return 0;
+}
+
+
+int32_t file_test( char *name, int32_t mode)
+{
+	int fd = 0;
+	
+	// open according to given mode
+	switch ( mode)
+	{
+		case 1:
+		{
+			fd = open( name, O_RDONLY);
+
+			break;
+		}
+		case 2:
+		{
+			fd = open( name, O_WRONLY);
+
+			break;
+		}
+		default:
+		{
+			printf("Mode error\n");
+
+			fd = -1;
+
+			break;
+		}
+	}// switch
+
+	// failed
+    if ( fd == -1)
+    {
+        perror( name);
+
+        return 1;
+    }// if
+    
+    close( fd);
+
+	// success
+	return 0;
 }
