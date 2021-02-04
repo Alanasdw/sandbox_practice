@@ -8,6 +8,10 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+// used for setrlimit
+#include <sys/time.h>
+#include <sys/resource.h>
+
 // used in close
 #include <unistd.h>
 
@@ -96,20 +100,61 @@ int main( int argc, char *argv[])
 
 	int32_t compile_result = compile( program);
 
+    // handle compile errors
     if ( compile_result != 0)
     {
         printf("Compile error %d\n", compile_result);
 
+        FILE *result = fopen( file_result, "w");
+
+        fprintf( result, "CE\n");
+
+        fclose( result);
+
         return -1;
     }// if
-   
 
     // multiprocess needed here
+    pid_t child_pid = fork();
 
+    if ( child_pid == -1)
+    {
+        // just in case
+        perror("Fork failed");
+
+        return -1;
+    }// if
+    else if ( child_pid != 0)
+    {
+        // parent process
+
+        // need to write a watcher so that if there is an child that does not end, it gets killed
+
+        // remember to waitpid() or something similar
+
+        // getrusage to get the used resources of the terminated child process
+
+        // determin the status of the result
+    }// else if
+    else
+    {
+        // child process
+
+        // set the limits given
+
+        // set the file io
+
+        // set the seccomp rules
+
+        // execute main
+
+        char *arguments[] = { "./main", 0};
+
+        execv( arguments[ 0], arguments);
+    }// else
 
     return 0;
 }
-
 
 int32_t file_test( char *name, int32_t mode)
 {
