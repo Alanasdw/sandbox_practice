@@ -12,6 +12,12 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+// used for waitid
+#include <sys/wait.h>
+
+// used to kill
+#include <signal.h>
+
 // used in close
 #include <unistd.h>
 
@@ -29,9 +35,19 @@
 #include "compile.h"
 
 #define ARGC_AMOUNT 10
+#define MAX_TIME 30
+
+typedef struct _sWatcher_Data
+{
+    time_t time;
+
+    pid_t child;
+} sWatcher_Data;
+
+int time_limit_kill;
 
 int32_t file_test( char *name, int32_t mode); // 1 = read, 2 = write
-
+void *watcher( void *data);
 
 int main( int argc, char *argv[])
 {
@@ -117,6 +133,9 @@ int main( int argc, char *argv[])
     // multiprocess needed here
     pid_t child_pid = fork();
 
+    // set the time limit kill
+    time_limit_kill = 0;
+
     if ( child_pid == -1)
     {
         // just in case
@@ -128,13 +147,92 @@ int main( int argc, char *argv[])
     {
         // parent process
 
+        // has a maximum run time if time limit is not specified
+        if ( time_limit == 0)
+        {
+            time_limit = MAX_TIME;
+        }// if
+
         // need to write a watcher so that if there is an child that does not end, it gets killed
 
-        // remember to waitpid() or something similar
+        sWatcher_Data data;
 
-        // getrusage to get the used resources of the terminated child process
+        data.child = child_pid;
+
+        data.time = time_limit;
+        
+        pthread_t thread;
+
+        // start watcher
+        pthread_create( &thread, NULL, &watcher, ( void *) &data);
+
+        siginfo_t child_info;
+
+        // wait for the child process to end or stop
+        if ( waitid( P_PID, child_pid, &child_info, WEXITED | WSTOPPED) == -1)
+        {
+            perror("Waitid failed\n");
+
+            pthread_join( thread, NULL);
+
+            return -1;
+        }// if
+
+        // stop the watcher thread
+        pthread_cancel( thread);
+        
+        pthread_join( thread, NULL);
+        
+        struct rusage usage;
+
+        // get child process usage
+        getrusage( RUSAGE_CHILDREN, &usage);
 
         // determin the status of the result
+
+        FILE *fresult = fopen( file_result, "w");
+
+        double used_time = (( usage.ru_utime.tv_sec * 1000) + usage.ru_utime.tv_usec) / 1000.0;
+
+        if ( child_info.si_code == CLD_EXITED)
+        {
+            // normally exited
+            if ( usage.ru_maxrss > memory_limit)
+            {
+                fprintf( fresult, "MLE\nMemory used ( kb) %ld\n", usage.ru_maxrss);
+            }// if
+            else
+            {
+                fprintf( fresult, "Normal execution\nTime used ( sec) %lf, Memory used %ld\n", used_time, usage.ru_maxrss);
+            }// else
+
+            fprintf( fresult, "Exit status %d\n", child_info.si_status);
+        }// if
+        else
+        {
+            // something happened
+            if ( child_info.si_status == SIGXFSZ)
+            {
+                fprintf( fresult, "OLE\nOutput limit %d\n", output_limit);
+            }// if
+            else if ( child_info.si_status == SIGKILL || child_info.si_status == SIGXCPU || time_limit_kill == 1)
+            {
+                fprintf( fresult, "TLE\nTime used ( sec) %lf\n", used_time);
+            }// else if
+            else if ( usage.ru_maxrss > memory_limit)
+            {
+                fprintf( fresult, "MLE\nMemory used ( kb) %ld\n", usage.ru_maxrss);
+            }// else if
+            else
+            {
+                fprintf( fresult, "RE\nRun time error\n");
+            }// else
+
+            fprintf( fresult, "%s\n", strsignal( child_info.si_status));
+        }// else
+
+        fclose( fresult);
+
     }// else if
     else
     {
@@ -197,4 +295,21 @@ int32_t file_test( char *name, int32_t mode)
 
 	// success
 	return 0;
+}
+
+void *watcher( void *data)
+{
+    struct timespec time;
+
+    time.tv_nsec = 0;
+
+    time.tv_sec = (( sWatcher_Data *) data) -> time;
+
+    nanosleep( &time, NULL);
+
+    kill( (( sWatcher_Data *) data) -> child, SIGKILL);
+
+    time_limit_kill = 1;
+
+    pthread_exit( NULL);
 }
