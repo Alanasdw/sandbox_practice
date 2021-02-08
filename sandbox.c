@@ -35,19 +35,10 @@
 #include "compile.h"
 
 #define ARGC_AMOUNT 10
-#define MAX_TIME 30
-
-typedef struct _sWatcher_Data
-{
-    time_t time;
-
-    pid_t child;
-} sWatcher_Data;
-
-int time_limit_kill;
+#define MAX_TIME 10
+#define KB 1024
 
 int32_t file_test( char *name, int32_t mode); // 1 = read, 2 = write
-void *watcher( void *data);
 
 int main( int argc, char *argv[])
 {
@@ -133,9 +124,6 @@ int main( int argc, char *argv[])
     // multiprocess needed here
     pid_t child_pid = fork();
 
-    // set the time limit kill
-    time_limit_kill = 0;
-
     if ( child_pid == -1)
     {
         // just in case
@@ -153,18 +141,7 @@ int main( int argc, char *argv[])
             time_limit = MAX_TIME;
         }// if
 
-        // need to write a watcher so that if there is an child that does not end, it gets killed
-
-        sWatcher_Data data;
-
-        data.child = child_pid;
-
-        data.time = time_limit;
-        
-        pthread_t thread;
-
-        // start watcher
-        pthread_create( &thread, NULL, &watcher, ( void *) &data);
+        // no need for a watcher process since the limit will SIGKILL on the hard CPU time limit
 
         siginfo_t child_info;
 
@@ -173,39 +150,36 @@ int main( int argc, char *argv[])
         {
             perror("Waitid failed\n");
 
-            pthread_join( thread, NULL);
-
             return -1;
         }// if
-
-        // stop the watcher thread
-        pthread_cancel( thread);
-        
-        pthread_join( thread, NULL);
         
         struct rusage usage;
 
         // get child process usage
-        getrusage( RUSAGE_CHILDREN, &usage);
+        if ( getrusage( RUSAGE_CHILDREN, &usage) == -1)
+        {
+            printf("get usage failed\n");
+        }// if
+
+        printf("memory of child %ld\n", usage.ru_maxrss);
 
         // determin the status of the result
 
         FILE *fresult = fopen( file_result, "w");
 
-        double used_time = (( usage.ru_utime.tv_sec * 1000) + usage.ru_utime.tv_usec) / 1000.0;
+        double used_time = usage.ru_utime.tv_sec + ( double) usage.ru_utime.tv_usec / 1000000.0;
 
         if ( child_info.si_code == CLD_EXITED)
         {
-            // normally exited
-            if ( usage.ru_maxrss > memory_limit)
+            if ( child_info.si_status == 0)
             {
-                fprintf( fresult, "MLE\nMemory used ( kb) %ld\n", usage.ru_maxrss);
+                fprintf( fresult, "Normal execution\nTime used ( sec) %lf, Memory used %ld\n", used_time, usage.ru_maxrss);
             }// if
             else
             {
-                fprintf( fresult, "Normal execution\nTime used ( sec) %lf, Memory used %ld\n", used_time, usage.ru_maxrss);
+                fprintf( fresult, "RE\nerror %s\n", strsignal( child_info.si_status));
             }// else
-
+            
             fprintf( fresult, "Exit status %d\n", child_info.si_status);
         }// if
         else
@@ -215,7 +189,7 @@ int main( int argc, char *argv[])
             {
                 fprintf( fresult, "OLE\nOutput limit %d\n", output_limit);
             }// if
-            else if ( child_info.si_status == SIGKILL || child_info.si_status == SIGXCPU || time_limit_kill == 1)
+            else if ( child_info.si_status == SIGKILL || child_info.si_status == SIGXCPU)
             {
                 fprintf( fresult, "TLE\nTime used ( sec) %lf\n", used_time);
             }// else if
@@ -228,7 +202,7 @@ int main( int argc, char *argv[])
                 fprintf( fresult, "RE\nRun time error\n");
             }// else
 
-            fprintf( fresult, "%s\n", strsignal( child_info.si_status));
+            fprintf( fresult, "Signal received = %s\n", strsignal( child_info.si_status));
         }// else
 
         fclose( fresult);
@@ -239,16 +213,85 @@ int main( int argc, char *argv[])
         // child process
 
         // set the limits given
+        if ( time_limit != 0)
+        {
+            struct rlimit lim;
+
+            lim.rlim_cur = time_limit;
+
+            lim.rlim_max = time_limit + 1;
+
+            setrlimit( RLIMIT_CPU, &lim);
+        }// if
+        else
+        {
+            // have a default time limit for hard kill
+            struct rlimit lim;
+
+            lim.rlim_cur = MAX_TIME;
+
+            lim.rlim_max = MAX_TIME;
+
+            setrlimit( RLIMIT_CPU, &lim);
+        }// else
+
+        if ( memory_limit != 0)
+        {
+            struct rlimit lim;
+
+            lim.rlim_cur = memory_limit * KB;
+
+            lim.rlim_max = lim.rlim_cur + 1 * KB;
+
+            // printf("%ld\n", lim.rlim_cur);
+
+            // something is wrong with this thing
+            // it fails when turned on( sometimes), not really sure on this one
+            // ./main: error while loading shared libraries: libc.so.6: failed to map segment from shared object
+            setrlimit( RLIMIT_AS, &lim);
+            // RLIMIT_DATA?? RLIMIT_RSS?? whats the difference?
+            
+        }// if
+        
+        if ( output_limit != 0)
+        {
+            struct rlimit lim;
+
+            lim.rlim_cur = output_limit;
+
+            lim.rlim_max = lim.rlim_cur + 1;
+
+            setrlimit( RLIMIT_FSIZE, &lim);
+        }// if
+
+        if ( process_limit != 0)
+        {
+            struct rlimit lim;
+
+            lim.rlim_cur = process_limit;
+
+            lim.rlim_max = lim.rlim_cur + 1;
+
+            setrlimit( RLIMIT_NPROC, &lim);
+        }// if
 
         // set the file io
+        if (strlen(file_stdout))
+        {
+            int fd = open(file_stdout, O_WRONLY);
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
 
         // set the seccomp rules
 
         // execute main
 
+        // setegid( 1);
+        // setuid( 1);
         char *arguments[] = { "./main", 0};
 
-        execv( arguments[ 0], arguments);
+        execvp( arguments[ 0], arguments);
     }// else
 
     return 0;
@@ -295,21 +338,4 @@ int32_t file_test( char *name, int32_t mode)
 
 	// success
 	return 0;
-}
-
-void *watcher( void *data)
-{
-    struct timespec time;
-
-    time.tv_nsec = 0;
-
-    time.tv_sec = (( sWatcher_Data *) data) -> time;
-
-    nanosleep( &time, NULL);
-
-    kill( (( sWatcher_Data *) data) -> child, SIGKILL);
-
-    time_limit_kill = 1;
-
-    pthread_exit( NULL);
 }
