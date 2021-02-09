@@ -1,3 +1,3 @@
-RE
-error Unknown signal 255
-Exit status 255
+Normal execution
+Time used ( sec) 0.043363, Memory used 22408
+Exit status 0
