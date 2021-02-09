@@ -3,7 +3,7 @@ CFLAGS = -Wall -g
 LIB = -pthread -lseccomp
 OUTPUT_OPTION = -MMD -MP -o $@
 
-SOURCE = sandbox.c compile.c
+SOURCE = sandbox.c compile.c rule.c
 OBJS = $(SOURCE:.c=.o)
 DEPS = $(SOURCE:.c=.d)
 -include ${DEPS}

@@ -2,5 +2,3 @@
 *.d
 sandbox
 main
-file_*.txt
-test.c

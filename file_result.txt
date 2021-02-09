@@ -1,2 +1,3 @@
-
-result file
+RE
+error Unknown signal 255
+Exit status 255

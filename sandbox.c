@@ -34,6 +34,9 @@
 // for compiling the program that is sent in
 #include "compile.h"
 
+// for the seccomp rules to be added
+#include "rule.h"
+
 #define ARGC_AMOUNT 10
 #define MAX_TIME 10
 #define KB 1024
@@ -193,13 +196,17 @@ int main( int argc, char *argv[])
             {
                 fprintf( fresult, "TLE\nTime used ( sec) %lf\n", used_time);
             }// else if
+            else if ( child_info.si_status == SIGSYS)
+            {
+                fprintf( fresult, "RE\nProhibited syscall\n");
+            }// else if
             else if ( usage.ru_maxrss > memory_limit)
             {
                 fprintf( fresult, "MLE\nMemory used ( kb) %ld\n", usage.ru_maxrss);
             }// else if
             else
             {
-                fprintf( fresult, "RE\nRun time error\n");
+                fprintf( fresult, "RE\nOther Run time error\n");
             }// else
 
             fprintf( fresult, "Signal received = %s\n", strsignal( child_info.si_status));
@@ -276,19 +283,34 @@ int main( int argc, char *argv[])
         }// if
 
         // set the file io
-        if (strlen(file_stdout))
-        {
-            int fd = open(file_stdout, O_WRONLY);
-            dup2(fd, STDOUT_FILENO);
-            close(fd);
-        }
+        int fd = open( file_stdout, O_WRONLY);
+
+        dup2( fd, STDOUT_FILENO);
+
+        close(fd);
+
+        fd = open( file_stdin, O_RDONLY);
+
+        dup2( fd, STDIN_FILENO);
+
+        close( fd);
+
+        fd = open( file_stderr, O_WRONLY);
+
+        dup2( fd, STDERR_FILENO);
+
+        close( fd);
 
         // set the seccomp rules
+        if ( add_rule( "./main") != 0)
+        {
+            return -1;
+        }// if
+
+        // setegid( 1); // not sure if i need to do this part
+        // setuid( 1);
 
         // execute main
-
-        // setegid( 1);
-        // setuid( 1);
         char *arguments[] = { "./main", 0};
 
         execvp( arguments[ 0], arguments);
